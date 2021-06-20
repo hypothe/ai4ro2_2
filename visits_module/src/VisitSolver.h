@@ -53,10 +53,11 @@ public:
 private:
     list<string> affected;
     list<string> dependencies;
+    double dist;
 
     double calculateExtern(double external, double total_cost);
-    //void localize(string from, string to);
     vector<string> findParameters(string line, int &n);
+    void localize( string from, string to);
 };
 
 #endif // TESTSOLVER_H

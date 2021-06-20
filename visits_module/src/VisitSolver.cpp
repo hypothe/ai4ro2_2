@@ -29,6 +29,8 @@
 #include "armadillo"
 #include <initializer_list>
 
+#include <boost/algorithm/string.hpp>
+
 using namespace std;
 using namespace arma;
 
@@ -110,7 +112,7 @@ map<string, double> VisitSolver::callExternalSolver(map<string, double> initialS
           string from = tmp.substr(0, 2); // from and to are regions, need to extract wps (poses)
           string to = tmp.substr(3, 2);
 
-          // localize(from, to);
+          localize(from, to);
         }
       }
     }
@@ -161,6 +163,7 @@ void VisitSolver::parseParameters(string parameters)
   {
     while (getline(parametersFile, line))
     {
+      boost::trim(line);
       curr = line.find(" ");
       string region_name = line.substr(0, curr).c_str();
       curr = curr + 1;
@@ -176,10 +179,11 @@ void VisitSolver::parseParameters(string parameters)
   }
 }
 
-double VisitSolver::calculateExtern(double external, double total_cost)
+double VisitSolver::calculateExtern(double dummy, double total_cost)
 {
   //float random1 = static_cast <float> (rand())/static_cast <float>(RAND_MAX);
-  double cost = 2; //random1;
+  //double cost = 2; //random1;
+  double cost = dist;
   return cost;
 }
 
@@ -194,6 +198,7 @@ void VisitSolver::parseWaypoint(string waypoint_file)
   {
     while (getline(parametersFile, line))
     {
+      boost::trim(line);
       curr = line.find("[");
       string waypoint_name = line.substr(0, curr).c_str();
 
@@ -246,5 +251,48 @@ void VisitSolver::parseLandmark(string landmark_file)
   }
 }
 
-//void VisitSolver::localize( string from, string to){
-//}
+void VisitSolver::localize( string from, string to){
+
+/*
+  TODO - EKF:
+  - retrieve position of the two waypoints associated to (from, to)
+  - separate the path (from->to) into 'N' small steps of length \deltaD
+  - foreach step:
+  --  update position + added odometry synthetic noise
+  --  forall beacons closer than threshold to current position:
+  ---   update the estimated EKF with the position and orientation of the beacon (with added synth noise)
+  - return the estimated cost as the dist + trace(covM)
+
+
+  for (double ii : start){cout << ii;}
+
+*/
+  string ws_="empty", wg_="empty";
+  double tmp_dist = datum::inf;
+
+  if (!region_mapping.count(from))  {throw invalid_argument(string("'from' region "+ from +" not found")); }
+  if (!region_mapping.count(to))  {throw invalid_argument(string("'to' region "+ to +" not found")); }   
+  for (string ws : region_mapping[from])
+  {
+    for (string wg : region_mapping[to])
+    {
+      if (!waypoint.count(ws))  {throw invalid_argument(string("'from' waypoint "+ ws +" not found")); }
+      if (!waypoint.count(wg))  {throw invalid_argument(string("'to' waypoint "+ wg +" not found")); }   
+
+      double tt = sqrt(pow(waypoint[wg][0] - waypoint[ws][0], 2) + pow(waypoint[wg][1] - waypoint[ws][1], 2));
+
+      if (tmp_dist > tt)
+      {
+        tmp_dist = tt;
+        ws_ = ws;
+        wg_ = wg;
+      }
+    }
+  }
+  if (ExternalSolver::verbose)
+  {
+    cout << endl << "(ws) " << ws_ << "; (wg) " << wg_ << " : " << tmp_dist << endl;
+  }
+
+  dist = tmp_dist;
+}
