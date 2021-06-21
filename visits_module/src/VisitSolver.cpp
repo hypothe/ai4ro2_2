@@ -139,7 +139,7 @@ map<string, double> VisitSolver::callExternalSolver(map<string, double> initialS
   double results = calculateExtern(dummy, act_cost);
   if (ExternalSolver::verbose)
   {
-    cout << "(dummy) " << results << endl;
+    std::cout << "(dummy) " << results << endl;
   }
 
   toReturn["(dummy)"] = results;
@@ -254,6 +254,12 @@ void VisitSolver::parseLandmark(string landmark_file)
   }
 }
 
+
+double dist2(arma::vec start, arma::vec goal)
+{
+  return sqrt(pow(goal(0) - start(0), 2) + pow(goal(1) - start(1), 2));
+}
+
 void VisitSolver::localize( string from, string to){
 
 /*
@@ -282,7 +288,9 @@ void VisitSolver::localize( string from, string to){
       if (!waypoint.count(ws))  {throw invalid_argument(string("'from' waypoint "+ ws +" not found")); }
       if (!waypoint.count(wg))  {throw invalid_argument(string("'to' waypoint "+ wg +" not found")); }   
 
-      double tt = sqrt(pow(waypoint[wg][0] - waypoint[ws][0], 2) + pow(waypoint[wg][1] - waypoint[ws][1], 2));
+      //double tt = sqrt(pow(waypoint[wg][0] - waypoint[ws][0], 2) + pow(waypoint[wg][1] - waypoint[ws][1], 2));
+
+      double tt = dist2(arma::conv_to<vec>::from(waypoint[ws]), arma::conv_to<vec>::from(waypoint[wg]));
 
       if (tmp_dist > tt)
       {
@@ -294,7 +302,7 @@ void VisitSolver::localize( string from, string to){
   }
   if (ExternalSolver::verbose)
   {
-    cout << endl << "(ws) " << ws_ << "; (wg) " << wg_ << " : " << tmp_dist << endl;
+    std::cout << endl << "(ws) " << ws_ << "; (wg) " << wg_ << " : " << tmp_dist << endl;
   }
 
   // dist = tmp_dist;
@@ -310,10 +318,10 @@ void VisitSolver::localize( string from, string to){
       synthetic odometry encoders.
     */
   const uint N_STEPS = ceil(tmp_dist/robot_vel * odom_rate);
-  cout << endl << "N_STEPS" << N_STEPS << endl;
+  std::cout << endl << "N_STEPS" << N_STEPS << endl;
   // vector<double> step_dim(3, 0), current_pose(waypoint[ws_]);
   
-  arma::vec step_dim(3), current_pose(3), syn_noise(3, arma::fill::ones);
+  arma::vec step_dim(3), X_k(3), syn_noise(3, arma::fill::ones);
   arma::mat P_k(3,3, arma::fill::eye), Q_a(3,3, arma::fill::eye); // Q_a: variance 1 of the "random" noise
   P_k = P_k * init_noise;
   Q_a = pow(odom_noise_mod,2) * Q_a;
@@ -327,21 +335,47 @@ void VisitSolver::localize( string from, string to){
   }
 
   /* */
+  arma::mat Beac(3, landmark.size());
+  int i = 0;
+  for (auto beacon : landmark)
+  {
+    Beac.col(i++) = arma::conv_to<vec>::from(beacon.second);
+  }
 
   for (uint i = 0; i < N_STEPS; i++)
   {
-      //syn_noise.randn();
-      syn_noise = syn_noise * odom_noise_mod;
-      current_pose = current_pose + step_dim + syn_noise;
+    //syn_noise.randn();
+    syn_noise = syn_noise * odom_noise_mod;
+    X_k = X_k + step_dim + syn_noise;
 
-      P_k = A * P_k * A.t() + Q_a;
+    P_k = A * P_k * A.t() + Q_a;
 
-      
+    Beac.each_col( [&X_k, &P_k, this](vec& y)
+      {
+        if (dist2(X_k, y) < beacon_dist_th)
+        {
+          //beaconDetectedEKF(X_k, P_k, y);
+          P_k.eye();
+          P_k = init_noise * P_k;
+        }
+      }
+    );
   }
 
   /**/
   dist = tmp_dist;
   trace = arma::trace(P_k);
 
-  cout << "Trace: " << trace << endl;
+  std::cout << "Trace: " << trace << endl;
+}
+
+void beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
+{
+  // pick y, make a 2x1 column vector storing dist and angle
+  // make a noisy version of it
+  // compute C matrix (dg/dX)
+  // compute K
+  // update X
+  // update P
+
 }

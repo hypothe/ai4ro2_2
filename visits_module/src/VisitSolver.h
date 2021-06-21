@@ -60,7 +60,7 @@ private:
     const double odom_rate = 20; // Hz
     const double odom_noise_mod = 0.14; // noise injected in the odometry
     const double init_noise = 0.02; // initial covariance value
-
+    const double beacon_dist_th = 3; // change it to something smaller for different beacons config
 
     double calculateExtern(double external, double total_cost);
     vector<string> findParameters(string line, int &n);
