@@ -58,7 +58,7 @@ private:
     // const int N_STEPS = 1000;
     const double robot_vel = 1; // m/s
     const double odom_rate = 20; // Hz
-    const double odom_noise_mod = 0.002; // noise injected in the odometry
+    const double odom_noise_mod = 0.14; // noise injected in the odometry
     const double init_noise = 0.02; // initial covariance value
 
 

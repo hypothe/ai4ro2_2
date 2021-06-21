@@ -186,7 +186,7 @@ double VisitSolver::calculateExtern(double dummy, double total_cost)
 {
   //float random1 = static_cast <float> (rand())/static_cast <float>(RAND_MAX);
   //double cost = 2; //random1;
-  double cost = dist;
+  double cost = dist + trace;
   return cost;
 }
 
@@ -259,7 +259,7 @@ void VisitSolver::localize( string from, string to){
 /*
   TODO - EKF:
   x retrieve position of the two waypoints associated to (from, to)
-  - separate the path (from->to) into 'N' small steps of length \deltaD
+  x separate the path (from->to) into 'N' small steps of length \deltaD
   - foreach step:
   --  update position + added odometry synthetic noise
   --  forall beacons closer than threshold to current position:
@@ -310,13 +310,16 @@ void VisitSolver::localize( string from, string to){
       synthetic odometry encoders.
     */
   const uint N_STEPS = ceil(tmp_dist/robot_vel * odom_rate);
+  cout << endl << "N_STEPS" << N_STEPS << endl;
   // vector<double> step_dim(3, 0), current_pose(waypoint[ws_]);
   
-  arma::vec step_dim(3), current_pose(3), syn_noise(3, fill::zeros);
-  arma::mat P_k(3,3, fill::eye);
+  arma::vec step_dim(3), current_pose(3), syn_noise(3, arma::fill::ones);
+  arma::mat P_k(3,3, arma::fill::eye), Q_a(3,3, arma::fill::eye); // Q_a: variance 1 of the "random" noise
   P_k = P_k * init_noise;
+  Q_a = pow(odom_noise_mod,2) * Q_a;
+  
 
-  mat A(3, 3, fill::eye);
+  mat A(3, 3, arma::fill::eye);
   
   for (uint i = 0; i <  waypoint[ws_].size(); i++)
   {
@@ -331,10 +334,14 @@ void VisitSolver::localize( string from, string to){
       syn_noise = syn_noise * odom_noise_mod;
       current_pose = current_pose + step_dim + syn_noise;
 
-      P_k = A * P_k * A.t();
+      P_k = A * P_k * A.t() + Q_a;
+
+      
   }
 
   /**/
   dist = tmp_dist;
   trace = arma::trace(P_k);
+
+  cout << "Trace: " << trace << endl;
 }
