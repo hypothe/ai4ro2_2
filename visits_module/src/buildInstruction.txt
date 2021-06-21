@@ -3,6 +3,6 @@
 mkdir ../build
 cd ../build
 
-cmake -DCMAKE_VERBOSE_MAKEFILE=TRUE -DCMAKE_BUILD_TYPE=Release ../src/
+cmake -DCMAKE_VERBOSE_MAKEFILE=TRUE -DCMAKE_BUILD_TYPE=Debug ../src/
 
 make

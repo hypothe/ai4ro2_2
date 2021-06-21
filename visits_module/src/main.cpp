@@ -41,9 +41,9 @@ int main(int argc, char **argv)
     region.push_back("r4");
 
     // store the initial state fluents
-    for (int i = 0; i < region.size(); i++)
+    for (uint i = 0; i < region.size(); i++)
     {
-        for (int j = 0; j < region.size(); j++)
+        for (uint j = 0; j < region.size(); j++)
         {
             if (i != j)
             {

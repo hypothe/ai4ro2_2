@@ -33,3 +33,5 @@
 
 # Build files
 build/
+visits_module/src/.vscode/launch.json
+visits_module/src/.vscode/tasks.json

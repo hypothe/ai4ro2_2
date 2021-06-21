@@ -16,6 +16,7 @@
      along with this program.  If not, see <http://www.gnu.org/licenses/>.
      */
 
+// #define ARMA_DONT_USE_WRAPPER
 #include "VisitSolver.h"
 #include "ExternalSolver.h"
 #include <map>
@@ -71,6 +72,8 @@ void VisitSolver::loadSolver(string *parameters, int n)
   string landmark_file = "/root/ai4ro2/visits_domain/landmark.txt";
   parseLandmark(landmark_file);
 
+  
+  //arma_rng::set_seed_random();
   //startEKF();
 }
 
@@ -255,7 +258,7 @@ void VisitSolver::localize( string from, string to){
 
 /*
   TODO - EKF:
-  - retrieve position of the two waypoints associated to (from, to)
+  x retrieve position of the two waypoints associated to (from, to)
   - separate the path (from->to) into 'N' small steps of length \deltaD
   - foreach step:
   --  update position + added odometry synthetic noise
@@ -294,5 +297,44 @@ void VisitSolver::localize( string from, string to){
     cout << endl << "(ws) " << ws_ << "; (wg) " << wg_ << " : " << tmp_dist << endl;
   }
 
+  // dist = tmp_dist;
+
+  // First version: split both position and orientation in equal number of steps
+  // A very simple controller working only for holonomic robots
+  // in the actual case, eg. for a (2,0) robot, it would first need to orient
+  // toward the goal position, reach it, then orient like the goal orientation
+
+  /*  To find the number of steps we divide the total length of the path,
+      position only, by the robot translational speed (to get an estimate of
+      the time taken) and then multiply that by the sample frequency for the
+      synthetic odometry encoders.
+    */
+  const uint N_STEPS = ceil(tmp_dist/robot_vel * odom_rate);
+  // vector<double> step_dim(3, 0), current_pose(waypoint[ws_]);
+  
+  arma::vec step_dim(3), current_pose(3), syn_noise(3, fill::zeros);
+  arma::mat P_k(3,3, fill::eye);
+  P_k = P_k * init_noise;
+
+  mat A(3, 3, fill::eye);
+  
+  for (uint i = 0; i <  waypoint[ws_].size(); i++)
+  {
+    step_dim(i) = (waypoint[wg_][i] - waypoint[ws_][i])/N_STEPS;
+  }
+
+  /* */
+
+  for (uint i = 0; i < N_STEPS; i++)
+  {
+      //syn_noise.randn();
+      syn_noise = syn_noise * odom_noise_mod;
+      current_pose = current_pose + step_dim + syn_noise;
+
+      P_k = A * P_k * A.t();
+  }
+
+  /**/
   dist = tmp_dist;
+  trace = arma::trace(P_k);
 }
