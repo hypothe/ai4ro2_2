@@ -26,6 +26,7 @@
 #include <iomanip>
 #include <queue>
 #include <unordered_map>
+#include "armadillo"
 
 using namespace std;
 
@@ -55,16 +56,17 @@ private:
     list<string> dependencies;
     double dist;
     double trace;
-    // const int N_STEPS = 1000;
     const double robot_vel = 1; // m/s
     const double odom_rate = 20; // Hz
     const double odom_noise_mod = 0.14; // noise injected in the odometry
+    const double detection_noise_mod = 0.04; // noise injected in the beacon detection
     const double init_noise = 0.02; // initial covariance value
     const double beacon_dist_th = 3; // change it to something smaller for different beacons config
 
     double calculateExtern(double external, double total_cost);
     vector<string> findParameters(string line, int &n);
     void localize( string from, string to);
+    void beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y);
 };
 
 #endif // TESTSOLVER_H

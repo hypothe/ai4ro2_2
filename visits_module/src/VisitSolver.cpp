@@ -339,6 +339,7 @@ void VisitSolver::localize( string from, string to){
   int i = 0;
   for (auto beacon : landmark)
   {
+    // cout << "Landmark" << beacon.first << " " << beacon.second[0] << "," << beacon.second[1] << "," << beacon.second[2] << endl;
     Beac.col(i++) = arma::conv_to<vec>::from(beacon.second);
   }
 
@@ -354,9 +355,10 @@ void VisitSolver::localize( string from, string to){
       {
         if (dist2(X_k, y) < beacon_dist_th)
         {
-          //beaconDetectedEKF(X_k, P_k, y);
-          P_k.eye();
-          P_k = init_noise * P_k;
+          cout << "IN y: " << y << endl;
+          beaconDetectedEKF(X_k, P_k, y);
+          //P_k.eye();
+          //P_k = init_noise * P_k;
         }
       }
     );
@@ -369,7 +371,7 @@ void VisitSolver::localize( string from, string to){
   std::cout << "Trace: " << trace << endl;
 }
 
-void beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
+void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
 {
   // pick y, make a 2x1 column vector storing dist and angle
   // make a noisy version of it
@@ -377,5 +379,47 @@ void beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
   // compute K
   // update X
   // update P
+  cout << "Start EKF" << endl;
+  cout << "EKF X_k" << X_k << " y " << y << endl;
+
+
+  arma::vec g(2);
+  double dist_g_m = dist2(X_k, y);
+  cout << "EKF dist: " << dist_g_m << endl;
+  g(0) = dist_g_m; //< distance of the beacon from the robot
+  g(1) = std::atan2(y(1)-X_k(1), y(0)-X_k(0)) - X_k(2); //< orientation of the beacon wrt the robot
+
+  cout << endl << "g " << g << endl;
+
+  /*
+    C = dg/dX = 
+    | 2(x_g - x_m)  2(y_G - y_m)    0  |
+    | (y_g - y_m)/D (x_g - x_m)/D   -1 |
+
+    D  = dist(Beacon, Robot)
+
+  */
+  arma::mat C_k(2, 3);
+  C_k(0, 0) = 2*(y(0) - X_k(0));
+  C_k(0, 1) = 2*(y(1) - X_k(1));
+  C_k(0, 2) = 0;
+  C_k(1, 0) = (y(1) - X_k(1))/dist_g_m;
+  C_k(1, 1) = (y(0) - X_k(0))/dist_g_m;
+  C_k(1, 2) = -1;
+
+  std::cout << endl << C_k << endl;
+
+  arma::vec Y_meas(g);
+  Y_meas = Y_meas + detection_noise_mod; //< TODO: make it random!
+  arma::mat Q_gamma(2,2,fill::eye);
+  Q_gamma = detection_noise_mod * Q_gamma;
+
+  // K: Innovation "trust" coefficient
+  arma::mat K_k(3, 2);
+  K_k = P_k * C_k.t() * (C_k * P_k * C_k.t() + Q_gamma).i();
+  // Update X_k -> X_{k+1}
+  X_k = X_k + K_k*(Y_meas - g);
+  // Update P_{k+1/k} -> P_{k+1/k+1}
+  P_k = (arma::eye(3,3) - K_k*C_k)*P_k;
 
 }
