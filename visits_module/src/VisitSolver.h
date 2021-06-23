@@ -56,12 +56,18 @@ private:
     list<string> dependencies;
     double dist;
     double trace;
+    const double trace_weight = 10.0; // DEBUG: set it to something high to test effect
     const double robot_vel = 1; // m/s
     const double odom_rate = 20; // Hz
-    const double odom_noise_mod = 0.14; // noise injected in the odometry
-    const double detection_noise_mod = 0.04; // noise injected in the beacon detection
+    const double odom_noise_mod = 0.05; // 0.05 noise injected in the odometry
+    /*  Why 5cm?  It's very high since the robot moves around 5cm each odom step (1m/s/20Hz) 
+        but generates a semi-realistic behavior.
+    */
+    const double detection_noise_mod = 0.005; // 0.05 noise injected in the beacon detection
+    /*  As above, a very rough guesstimate  */
+
     const double init_noise = 0.02; // initial covariance value
-    const double beacon_dist_th = 3; // change it to something smaller for different beacons config
+    const double beacon_dist_th = 1.5; // 1.5, with square beacons, change it to something smaller for different beacons config
 
     double calculateExtern(double external, double total_cost);
     vector<string> findParameters(string line, int &n);
