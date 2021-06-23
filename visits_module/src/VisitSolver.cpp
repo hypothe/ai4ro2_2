@@ -26,6 +26,7 @@
 #include <fstream>
 #include <vector>
 #include <algorithm>
+#include <math.h>
 
 #include "armadillo"
 #include <initializer_list>
@@ -72,7 +73,17 @@ void VisitSolver::loadSolver(string *parameters, int n)
   string landmark_file = "/root/ai4ro2/visits_domain/landmark.txt";
   parseLandmark(landmark_file);
 
-  
+  cout << "region-mapping" << endl;
+  for (auto region : region_mapping)
+  {
+    cout << "\t" << region.first << ":\t";
+    for (auto wp : region.second)
+    {
+      cout << wp << "\t";
+    }
+    cout << endl;
+  }
+
   arma::arma_rng::set_seed_random();
   //startEKF();
 }
@@ -102,7 +113,7 @@ map<string, double> VisitSolver::callExternalSolver(map<string, double> initialS
     if (n != -1)
     {
       string arg = function;
-      string tmp = function.substr(n + 1, 5);
+      string tmp = function.substr(n + 1);
 
       function.erase(n, function.length() - 1);
       arg.erase(0, n + 1);
@@ -111,10 +122,16 @@ map<string, double> VisitSolver::callExternalSolver(map<string, double> initialS
         trigger[arg] = value > 0 ? 1 : 0;
         if (value > 0)
         {
+          int curr1 = tmp.find(" ");
+          string from = tmp.substr(0, curr1); // from and to are regions, need to extract wps (poses)
+          int curr2 = tmp.find(" ", curr1+1);
+          string to = tmp.substr(curr1+1, curr2);
 
-          string from = tmp.substr(0, 2); // from and to are regions, need to extract wps (poses)
-          string to = tmp.substr(3, 2);
+          p_from_ = from;
+          p_to_ = to;
 
+          cout << endl << "TMP: " << tmp << "FROM: " << from << " TO: " << to << endl;
+          /*  LOCALIZE  */
           localize(from, to);
         }
       }
@@ -186,8 +203,8 @@ double VisitSolver::calculateExtern(double dummy, double total_cost)
 {
   //float random1 = static_cast <float> (rand())/static_cast <float>(RAND_MAX);
   //double cost = 2; //random1;
-  cout << endl << "dist_" << dist << " trace_" << trace << endl;
   double cost = dist + trace_weight*trace; /*  The trace is here given an extra weight  */
+  cout << endl << "(" << p_from_ << ")->(" << p_to_ << "): " << "dist_" << dist << " trace_" << trace << " cost_" << cost << endl;
   return cost;
 }
 
@@ -261,6 +278,15 @@ double dist2(arma::vec start, arma::vec goal)
   return sqrt(pow(goal(0) - start(0), 2) + pow(goal(1) - start(1), 2));
 }
 
+double normAngle(double angle)
+{
+  angle = fmod(angle, 2 * arma::datum::pi);
+  if (angle < 0) {
+    angle += arma::datum::pi;
+  }
+  return angle;
+}
+
 void VisitSolver::localize( string from, string to){
 
 /*
@@ -277,7 +303,7 @@ void VisitSolver::localize( string from, string to){
   for (double ii : start){cout << ii;}
 
 */
-  string ws_="empty", wg_="empty";
+  string ws_, wg_;
   double tmp_dist = datum::inf;
 
   if (!region_mapping.count(from))  {throw invalid_argument(string("'from' region "+ from +" not found")); }
@@ -325,14 +351,16 @@ void VisitSolver::localize( string from, string to){
   arma::mat P_k(3,3, arma::fill::eye), Q_a(3,3, arma::fill::eye); // Q_a: variance 1 of the "random" noise
   /*  Initiate the current position (with covariance matrix) */
   X_k = arma::conv_to<arma::vec>::from(waypoint[ws_]);
-  P_k = P_k * init_noise;
+  P_k = P_k * pow(init_noise, 2);
   /*  Covariance matrix of the noise introduced by the odometry  */
   Q_a = pow(odom_noise_mod,2) * Q_a;
   
 
   mat A(3, 3, arma::fill::eye);
-  
-  for (uint i = 0; i <  waypoint[ws_].size(); i++)
+  waypoint[ws_][2] = normAngle(waypoint[ws_][2]);
+  waypoint[wg_][2] = normAngle(waypoint[wg_][2]);
+
+      for (uint i = 0; i < waypoint[ws_].size(); i++)
   {
     step_dim(i) = (waypoint[wg_][i] - waypoint[ws_][i])/N_STEPS;
   }
@@ -344,6 +372,7 @@ void VisitSolver::localize( string from, string to){
     Beac.col(i++) = arma::conv_to<arma::vec>::from(beacon.second);
   }
 
+  bool flag = false;
   for (uint i = 0; i < N_STEPS; i++)
   {
     syn_noise = arma::randn<vec>(3) * odom_noise_mod;
@@ -353,10 +382,12 @@ void VisitSolver::localize( string from, string to){
 
     P_k = A * P_k * A.t() + Q_a;
 
-    Beac.each_col( [&X_k, &P_k, this](vec& y)
+    Beac.each_col( [&X_k, &P_k, this, &flag](vec& y)
       {
         if (dist2(X_k, y) < beacon_dist_th)
         {
+          if (!flag){cout << endl << "(" << p_from_ << ")->(" << p_to_ << "): beacon detected" << endl;
+                     flag = true; }
           beaconDetectedEKF(X_k, P_k, y);
         }
       }
