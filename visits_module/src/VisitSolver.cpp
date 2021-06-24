@@ -73,19 +73,7 @@ void VisitSolver::loadSolver(string *parameters, int n)
   string landmark_file = "/root/ai4ro2/visits_domain/landmark.txt";
   parseLandmark(landmark_file);
 
-  cout << "region-mapping" << endl;
-  for (auto region : region_mapping)
-  {
-    cout << "\t" << region.first << ":\t";
-    for (auto wp : region.second)
-    {
-      cout << wp << "\t";
-    }
-    cout << endl;
-  }
-
   arma::arma_rng::set_seed_random();
-  //startEKF();
 }
 
 map<string, double> VisitSolver::callExternalSolver(map<string, double> initialState, bool isHeuristic)
@@ -101,7 +89,6 @@ map<string, double> VisitSolver::callExternalSolver(map<string, double> initialS
 
   for (; iSIt != isEnd; ++iSIt)
   {
-
     string parameter = iSIt->first;
     string function = iSIt->first;
     double value = iSIt->second;
@@ -130,7 +117,6 @@ map<string, double> VisitSolver::callExternalSolver(map<string, double> initialS
           p_from_ = from;
           p_to_ = to;
 
-          cout << endl << "TMP: " << tmp << "FROM: " << from << " TO: " << to << endl;
           /*  LOCALIZE  */
           localize(from, to);
         }
@@ -146,10 +132,6 @@ map<string, double> VisitSolver::callExternalSolver(map<string, double> initialS
       {
         act_cost = value;
       }
-      //else if(function=="dummy1"){
-      //duy = value;
-      ////cout << parameter << " " << value << endl;
-      //}
     }
   }
 
@@ -203,8 +185,11 @@ double VisitSolver::calculateExtern(double dummy, double total_cost)
 {
   //float random1 = static_cast <float> (rand())/static_cast <float>(RAND_MAX);
   //double cost = 2; //random1;
-  double cost = dist + trace_weight*trace; /*  The trace is here given an extra weight  */
-  cout << endl << "(" << p_from_ << ")->(" << p_to_ << "): " << "dist_" << dist << " trace_" << trace << " cost_" << cost << endl;
+  double cost = dist + trace_weight *trace; /*  The trace is here given an extra weight  */
+  if (ExternalSolver::verbose)
+  {
+    cout << endl << "(" << p_from_ << ")->(" << p_to_ << "): " << "dist_" << dist << " trace_" << trace << " cost_" << cost << endl;
+  }
   return cost;
 }
 
@@ -289,7 +274,7 @@ double normAngle(double angle)
 
 void VisitSolver::localize( string from, string to){
 
-/*
+  /*
   TODO - EKF:
   x retrieve position of the two waypoints associated to (from, to)
   x separate the path (from->to) into 'N' small steps of length \deltaD
@@ -299,10 +284,7 @@ void VisitSolver::localize( string from, string to){
   ---   update the estimated EKF with the position and orientation of the beacon (with added synth noise)
   - return the estimated cost as the dist + trace(covM)
 
-
-  for (double ii : start){cout << ii;}
-
-*/
+  */
   string ws_, wg_;
   double tmp_dist = datum::inf;
 
@@ -314,8 +296,6 @@ void VisitSolver::localize( string from, string to){
     {
       if (!waypoint.count(ws))  {throw invalid_argument(string("'from' waypoint "+ ws +" not found")); }
       if (!waypoint.count(wg))  {throw invalid_argument(string("'to' waypoint "+ wg +" not found")); }   
-
-      //double tt = sqrt(pow(waypoint[wg][0] - waypoint[ws][0], 2) + pow(waypoint[wg][1] - waypoint[ws][1], 2));
 
       double tt = dist2(arma::conv_to<vec>::from(waypoint[ws]), arma::conv_to<vec>::from(waypoint[wg]));
 
@@ -345,7 +325,6 @@ void VisitSolver::localize( string from, string to){
       synthetic odometry encoders.
     */
   const uint N_STEPS = ceil(tmp_dist/robot_vel * odom_rate);
-  // std::cout << endl << "N_STEPS" << N_STEPS << endl;
   
   arma::vec step_dim(3), X_k(3), syn_noise(3, arma::fill::zeros);
   arma::mat P_k(3,3, arma::fill::eye), Q_a(3,3, arma::fill::eye); // Q_a: variance 1 of the "random" noise
@@ -378,15 +357,14 @@ void VisitSolver::localize( string from, string to){
     syn_noise = arma::randn<vec>(3) * odom_noise_mod;
     X_k = X_k + step_dim + syn_noise;
 
-    // cout << X_k << endl;
-
     P_k = A * P_k * A.t() + Q_a;
 
     Beac.each_col( [&X_k, &P_k, this, &flag](vec& y)
       {
         if (dist2(X_k, y) < beacon_dist_th)
         {
-          if (!flag){cout << endl << "(" << p_from_ << ")->(" << p_to_ << "): beacon detected" << endl;
+
+          if (!flag && ExternalSolver::verbose){cout << endl << "(" << p_from_ << ")->(" << p_to_ << "): beacon detected" << endl;
                      flag = true; }
           beaconDetectedEKF(X_k, P_k, y);
         }
@@ -394,11 +372,8 @@ void VisitSolver::localize( string from, string to){
     );
   }
 
-  /**/
   dist = tmp_dist;
   trace = arma::trace(P_k);
-
-  // std::cout << "Trace: " << trace << endl;
 }
 
 void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
@@ -410,17 +385,11 @@ void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
   // update X
   // update P
 
-  // cout << "Start EKF" << endl;
-  // cout << "EKF X_k" << X_k << " y " << y << endl;
-
-
   arma::vec g(2);
   double dist_g_m = dist2(X_k, y);
-  // cout << "EKF dist: " << dist_g_m << endl;
   g(0) = dist_g_m; //< distance of the beacon from the robot
   g(1) = std::atan2(y(1)-X_k(1), y(0)-X_k(0)) - X_k(2); //< orientation of the beacon wrt the robot
 
-  // cout << endl << "g " << g << endl;
 
   /*
     C = dg/dX = 
@@ -428,7 +397,6 @@ void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
     | (y_g - y_m)/D (x_g - x_m)/D   -1 |
 
     D  = dist(Beacon, Robot)
-
   */
   arma::mat C_k(2, 3);
   C_k(0, 0) = 2*(y(0) - X_k(0));
@@ -437,8 +405,6 @@ void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
   C_k(1, 0) = (y(1) - X_k(1))/dist_g_m;
   C_k(1, 1) = (y(0) - X_k(0))/dist_g_m;
   C_k(1, 2) = -1;
-
-  // std::cout << endl << C_k << endl;
 
   arma::vec Y_meas(g);
   Y_meas = Y_meas + arma::randn<vec>(2) * detection_noise_mod;

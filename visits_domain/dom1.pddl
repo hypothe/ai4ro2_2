@@ -8,7 +8,7 @@
 
 (:predicates
 		(robot_in ?v - robot ?r - region) (visited ?r - region )
-		(connected ?from ?to - region)
+		(connected ?r1 ?r2 - region)
 )
 
 (:functions 
@@ -18,14 +18,16 @@
 (:action visit_region
 		:parameters (?v - robot ?r - region)
 		:precondition (robot_in ?v ?r)
-	    :effect (and (visited ?r))
+	    :effect (visited ?r)
 )
 
 (:durative-action localize
 		:parameters (?v - robot ?from ?to - region)
 		:duration (= ?duration 100)
-		:condition (and (at start (robot_in ?v ?from)) (at start (connected ?from ?to)))
-		:effect (and 
+		:condition (and (at start (robot_in ?v ?from))
+						(over all (connected ?from ?to)) ;; comment out for a sparsely connected graph
+					) 
+		:effect (and
 					(at start (not (robot_in ?v ?from))) (at start (assign (dummy) 0))
 					(at start (increase (triggered ?from ?to) 1))
 					(at end (robot_in ?v ?to)) (at end (assign (triggered ?from ?to) 0))	
