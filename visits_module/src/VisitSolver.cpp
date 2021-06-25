@@ -386,10 +386,9 @@ void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
   // update P
 
   arma::vec g(2);
-  double dist_g_m = dist2(X_k, y);
-  g(0) = dist_g_m; //< distance of the beacon from the robot
+  double dist2_g_m = pow(dist2(X_k, y), 2);
+  g(0) = dist2_g_m; //< distance of the beacon from the robot
   g(1) = std::atan2(y(1)-X_k(1), y(0)-X_k(0)) - X_k(2); //< orientation of the beacon wrt the robot
-
 
   /*
     C = dg/dX = 
@@ -402,8 +401,8 @@ void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
   C_k(0, 0) = 2*(y(0) - X_k(0));
   C_k(0, 1) = 2*(y(1) - X_k(1));
   C_k(0, 2) = 0;
-  C_k(1, 0) = (y(1) - X_k(1))/dist_g_m;
-  C_k(1, 1) = (y(0) - X_k(0))/dist_g_m;
+  C_k(1, 0) = (y(1) - X_k(1))/dist2_g_m;
+  C_k(1, 1) = (y(0) - X_k(0))/dist2_g_m;
   C_k(1, 2) = -1;
 
   arma::vec Y_meas(g);
@@ -419,4 +418,5 @@ void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
   // Update P_{k+1/k} -> P_{k+1/k+1}
   P_k = (arma::eye(3,3) - K_k*C_k)*P_k;
 
+  X_k = X_k + K_k * (Y_meas - g);
 }
