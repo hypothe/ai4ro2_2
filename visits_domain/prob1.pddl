@@ -40,7 +40,7 @@
 (:goal 
      (and (visited r4)  (visited r3)
           (visited r2) (visited r1) 
-          (>= (act-cost) 0)
+          ;(>= (act-cost) 0)
      )
 )
 (:metric minimize (act-cost))

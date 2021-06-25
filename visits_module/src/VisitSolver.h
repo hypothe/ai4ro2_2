@@ -56,17 +56,19 @@ private:
     list<string> dependencies;
     double dist;
     double trace;
-    const double trace_weight = 50.0; // 50
+    const double trace_weight = 50.0; //< empirically found, in order to be comparable with Euclidean distance
     const double robot_vel = 0.1; // m/s
     const double odom_rate = 20; // Hz
-    const double odom_noise_mod = 0.025; // 0.05 noise injected in the odometry
-    /*  Why 1cm?  It's very high since the robot moves around 5mm each odom step (0.1m/s/20Hz) 
-        but generates a semi-realistic behavior.
+    const double odom_noise_mod = 0.005; //< 0.005 noise injected in the odometry
+    /*  Why 5mm? Considering only translational movements, the robot here dedfined moves
+        about 5mm each odometry step (0.1m/s / 20Hz ->  0.005m): the odometry error is
+        comparable with the robot displacement, not a great odometry for sure, but serves
+        for the purposes of the test presented.
     */
-    const double detection_noise_mod = 0.05; // 0.05 noise injected in the beacon detection
-    /*  As above, a very rough guesstimate  */
+    const double detection_noise_mod = 0.05; //< 0.05 noise injected in the beacon detection
+    /*  As above, a rough guesstimate  */
 
-    const double init_noise = 0.14; // initial covariance value, sigma^2  = 0.02
+    const double init_noise = 0.14; //< initial covariance value, sigma^2  = 0.02
     const double beacon_dist_th = 0.5; 
 
     std::string p_from_, p_to_;
@@ -74,7 +76,7 @@ private:
     double calculateExtern(double external, double total_cost);
     vector<string> findParameters(string line, int &n);
     void localize( string from, string to);
-    void beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y);
+    void beaconDetectedEKF(arma::vec &X_k, arma::vec X_k_ref, arma::mat &P_k, arma::vec y);
 };
 
 #endif // TESTSOLVER_H

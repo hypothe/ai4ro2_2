@@ -283,7 +283,6 @@ void VisitSolver::localize( string from, string to){
   --  forall beacons closer than threshold to current position:
   ---   update the estimated EKF with the position and orientation of the beacon (with added synth noise)
   - return the estimated cost as the dist + trace(covM)
-
   */
   string ws_, wg_;
   double tmp_dist = datum::inf;
@@ -330,6 +329,10 @@ void VisitSolver::localize( string from, string to){
   arma::mat P_k(3,3, arma::fill::eye), Q_a(3,3, arma::fill::eye); // Q_a: variance 1 of the "random" noise
   /*  Initiate the current position (with covariance matrix) */
   X_k = arma::conv_to<arma::vec>::from(waypoint[ws_]);
+
+  // The reference robot state, unaffected by noise, used to simulate beacon detection
+  arma::vec X_k_ref = X_k;
+
   P_k = P_k * pow(init_noise, 2);
   /*  Covariance matrix of the noise introduced by the odometry  */
   Q_a = pow(odom_noise_mod,2) * Q_a;
@@ -355,18 +358,23 @@ void VisitSolver::localize( string from, string to){
   for (uint i = 0; i < N_STEPS; i++)
   {
     syn_noise = arma::randn<vec>(3) * odom_noise_mod;
+    X_k_ref = X_k_ref + step_dim;
     X_k = X_k + step_dim + syn_noise;
 
     P_k = A * P_k * A.t() + Q_a;
 
-    Beac.each_col( [&X_k, &P_k, this, &flag](vec& y)
+    Beac.each_col( [&X_k, X_k_ref, &P_k, this, &flag](vec& y)
       {
-        if (dist2(X_k, y) < beacon_dist_th)
+        if (dist2(X_k_ref, y) < beacon_dist_th)
         {
 
-          if (!flag && ExternalSolver::verbose){cout << endl << "(" << p_from_ << ")->(" << p_to_ << "): beacon detected" << endl;
-                     flag = true; }
-          beaconDetectedEKF(X_k, P_k, y);
+          if (!flag && ExternalSolver::verbose)
+          {
+            cout << endl << "(" << p_from_ << ")->(" << p_to_ << "): beacon detected ["
+                    << X_k_ref(0) << ", " << X_k_ref(1) << "]:[" << y(0) << ", " << y(1) << "]" << endl;
+                     flag = true;
+          }
+          beaconDetectedEKF(X_k, X_k_ref, P_k, y);
         }
       }
     );
@@ -376,7 +384,7 @@ void VisitSolver::localize( string from, string to){
   trace = arma::trace(P_k);
 }
 
-void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
+void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::vec X_k_ref, arma::mat& P_k, arma::vec y)
 {
   // pick y, make a 2x1 column vector storing dist and angle
   // make a noisy version of it
@@ -384,11 +392,20 @@ void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
   // compute K
   // update X
   // update P
+  arma::vec Y_meas(2);  
+                        
+                        
+  double dist2_ref = pow(dist2(X_k_ref, y), 2); // we imagine here to have, magically, a
+                                                // "distance squared" sensor to ease computation
+                                                // in this toy example
+  Y_meas(0) = dist2_ref; //< distance of the beacon from the robot, "measured"
+  Y_meas(1) = std::atan2(y(1)-X_k_ref(1), y(0)-X_k_ref(0)) - X_k_ref(2); //< orientation of the beacon wrt the robot, "measured"
+  Y_meas = Y_meas + arma::randn<vec>(2) * detection_noise_mod;  // add synthetic noise to the measurement
 
   arma::vec g(2);
-  double dist2_g_m = pow(dist2(X_k, y), 2);
-  g(0) = dist2_g_m; //< distance of the beacon from the robot
-  g(1) = std::atan2(y(1)-X_k(1), y(0)-X_k(0)) - X_k(2); //< orientation of the beacon wrt the robot
+  double dist2_g_m = pow(dist2(X_k, y), 2); 
+  g(0) = dist2_g_m; //< distance of the beacon from the robot, "expected"
+  g(1) = std::atan2(y(1)-X_k_ref(1), y(0)-X_k_ref(0)) - X_k_ref(2); //< orientation of the beacon wrt the robot, "expected"
 
   /*
     C = dg/dX = 
@@ -405,8 +422,6 @@ void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
   C_k(1, 1) = (y(0) - X_k(0))/dist2_g_m;
   C_k(1, 2) = -1;
 
-  arma::vec Y_meas(g);
-  Y_meas = Y_meas + arma::randn<vec>(2) * detection_noise_mod;
   arma::mat Q_gamma(2,2, arma::fill::eye);
   Q_gamma = std::pow(detection_noise_mod,2) * Q_gamma;
 
@@ -415,8 +430,8 @@ void VisitSolver::beaconDetectedEKF(arma::vec& X_k, arma::mat& P_k, arma::vec y)
   K_k = P_k * C_k.t() * arma::inv(C_k * P_k * C_k.t() + Q_gamma);
   // Update X_k -> X_{k+1}
   //  *** X_k = X_k + K_k*(Y_meas - g); ***
+  X_k = X_k + K_k * (Y_meas - g);
   // Update P_{k+1/k} -> P_{k+1/k+1}
   P_k = (arma::eye(3,3) - K_k*C_k)*P_k;
 
-  X_k = X_k + K_k * (Y_meas - g);
 }
