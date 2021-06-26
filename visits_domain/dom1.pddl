@@ -25,7 +25,7 @@
 		:parameters (?v - robot ?from ?to - region)
 		:duration (= ?duration 100)
 		:condition (and (at start (robot_in ?v ?from))
-						(over all (connected ?from ?to)) ;; comment out for a sparsely connected graph
+						(over all (connected ?from ?to)) ;; comment for a fully connected graph
 					) 
 		:effect (and
 					(at start (not (robot_in ?v ?from))) (at start (assign (dummy) 0))

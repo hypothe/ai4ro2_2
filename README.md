@@ -1,9 +1,3 @@
-- overall description of what the systems does
-- changes in the domain and problem files
-- changes in the external solver/semantic attachment/C++
-- how to use
-- maybe documemtn code(?)
-
 # AI4RO2 - Second Assignment
 
 ## Task Motion Planning
@@ -13,6 +7,21 @@ The goal of the system is to implement a PPDL 2.1 domain dealing with the moveme
 Each path between two regions is associated with a cost, a function of the Euclidean distance between their two closest waypoints and the trace of the Covariance matrix associated to the robot State ($x, y, \theta$); the robot state is, in fact, assumed affected by uncertainties due to odometry errors, which add up during the whole path between two waypoints. Beacons are present in the environment and provide an extrinsic reference, being measurable by the robot when passing close enough to one of them, obtaining both the squared distance and the relative heading with respect to the robot frame (assumed coinciding with the sensor providing such data). This data is used in an Extended Kalman Filter model, in order to update the robot state and the Covariance matrix associated to it.
 The path planning is carried out by the PDDL 2.1 planner, whilst an external solver (*a semantic attachment*) computed the weight associated to each edge between regions.
 More info on each step in the respective section later on.
+
+## The Map
+```
+....o...o....  
+..*---*---*..  
+.o|.x.|.x.|o.  
+..*---*---*..  
+.o|.x.|.x.|o.  
+..*---*---*..  
+....o...o....  
+```
+
+Where the `*` represent waypoints, `o` beacons, the lines edges of the region graph (`-`, ,`|`, and also `x`, representing two diagonal connections).
+The robot starts in the center region (0,0) and has to reach the 4 cardinal regions (1:E, 2:N, 3:W, 4:S), whereas the vertices of the square are just intermediate regions (12:NE, 23:NW, 34:SW, 41:SE).
+Passing for the outer edges brings the robot close enough to the beacons to detect them and reduce the uncertainty on its state, and are thus to be preferred in this implementation.
 
 ---
 
@@ -25,17 +34,85 @@ At the same time, the previously defined action `goto_region` has been changed i
 
 Furthermore, the connectivity of the waypoint graph has been reduced, from full to implementation specific, thanks to the addition of the `(connected region1 region2)` predicate. This choice has been made both to reduce, albeit slightly, the search space dimension at each step, and to better demonstrate the effect of the external planner in the definition of the cost.
 
-## Empirical values
+## Motion Planning
 
-- trace-weight: between 20-50
+The computation-side of the planning is being taken care of by an External Solver, implemented here as in the library `libVisits.so`. The majority of its implementation is done in the `VisitSolver` class.
+The robot here modeled is a simple holonomic one, so as not to have constraints in the path planning, allowing for simple straight paths between start and goal poses; the choice has been made to speed up developing and testing. Ideally the system should work also for more complex robot models, with a few modifications in the matrices used by the EKF.
 
-- odom_noise_mod: 0.01, very high, but allows to see the effect of the increase of P
+Each time a request for a localization is detected, the system finds the two closest waypoints in the  regions to move `(from, to)` 
 
-## Running
+> NOTE: here only one waypoint is expressed for each region, but the system can seamlessly be extended to a more general scenario.
+> 
+To simulate the robot movement, the path is then split up into segment as long as the distance traveled (ideally) by the robot between two consecutive odometry measurements (see later subsection with estimations for more info on this aspect).
+For each of these steps the robot state `X_k` is updated, as is its covariance matrix `P_k`, with only the odometry data and a synthetic noise simulating odometry inaccuracy.  
+Furthermore, if the robot is close enough to one of the beacons, `X_k` and `P_k` are updated with EKF approach, using the measurement **innovation** and the "confidence" in such value.
+
+$$
+\begin{cases}
+    \hat X_{k+1/k} = \Delta D_{k} + \alpha_{k} \\
+    P_{k+1/k} = A_k P_{k/k} * A_k^T + Q_{\alpha}
+\end{cases}
+$$
+> *Odometry-only update*
+
+
+$$
+\begin{cases}
+    \hat X_{k+1/k+1} = \hat X_{k+1/k} + K_k (Y_k - g (\hat X_{k+1/k} ) ) \\
+    P_{k+1/k+1} = (I - K_kC_k)P_{k+1/k}
+\end{cases}
+$$
+> *Beacon-detection update*
+
+*See [Extended Kalman Filter](https://en.wikipedia.org/wiki/Extended_Kalman_filter) on Wikipedia for more details on what each term is.* 
+
+### EKF tuning
+
+EKF parameters, mostly noise related ones, need to be  tuned to correctly model the system. In this specific case, since no details were given on the possible sensors or type of robot used, the values have been found through guesstimates and empirical tests, until the desired and expected behavior of the system emerged.
+Plese refer to the `VisitSolver.h` header to for any further info on those values, here reported for accessibility:
+
+- **robot_vel = 0.1**   
+ The robot linear velocity, used to detect the minimum displacement $\Delta D$ between two successive odometry measures. Chosen *10 cm/s* as a reasonable value for a lab robot.
+- **odom_rate = 20**  
+ The sample rate of the fake odometry sensor, expressed in Hz. Again, a reasonable guesstimate to demonstrate its impact on the state evolution.
+- **odom_noise_mod = 0.005**   
+ The $\sigma_{odom}$: due to the synthetic nature of the introduced noise, a balance between $\Delta D$ and Gaussian noise amplitude had to be defined (otherwise the system would update too fast with an unreasonably large error, or viceversa). The value chosen, *5mm*, is roughly the robot translational movement between two odometry step. Setting the odometry error to the same order of magnitude makes its impact easy to see, and not unheard of (although, of course, a more realistic system would see different errors depending on the control and robot configuration).
+ - **detection_noise_mod = 0.05**  
+  The $\sigma_{meas}$: uncertainty on the "measured" beacon position, here *5 cm*.
+- **beacon_dist_th = 0.5**  
+ The distance at which the robot can detect a beacon, here *50 cm*. It's pretty small, given the *5 cm* detection error on the beacon measurement, but serves its purposes in the designed system, "enforcing" some routes (the external ones) instead of others. Definetely not a superlative beacon choice, might be akin to AprilTags?
+- **init_noise = 0.14**   
+ The starting noise for each localization attempt, so as to have $P_{init} = 0.02 * I_{3x3}$
+- **trace-weight = 50**  
+ The weight given to the $trace(P_k)$ in the cost of each region graph edge (the one returned to the *Task Planning* side and ideally to minimize). This valueshas been empirically found to yield a good balance between the Euclidean distance `(start,goal)` and the "confidence" in the path.  
+ The cost function becomes
+ $$
+    cost = dist(start,goal) + 50*trace(P_{(start,goal)})
+ $$
+where the notation used for $P$ indicates the covariance matrix obtained by running the EKF from the starting to the goal configuration.
+
+## Building and Running
+
+As mentioned, the planning used is [popf-tif](https://github.com/popftif/popf-tif), which needs to be installed together with this package.
+This package uses [Armadillo](http://arma.sourceforge.net/docs.html) tools to optimize the matrix computations, please install it as well and pay attention to all the dependencies it needs.
+Lastly, the *semantic attachment* library can be built with
 
 ```bash
-    popf3-clp -x -n -t100 dom1.pddl prob1.pddl ../visits_module/build/libVisits.so region_poses
+    ai4ro2_2/visit_module/src# ./buildInstructions.txt
 ```
+
+Once that process completes the planner can be executed with
+
+```bash
+    ai4ro2_2/visit_domain# path/to/popf3-clp -x -n -t10 dom1.pddl prob1.pddl ../visits_module/build/libVisits.so region_poses
+```
+The `-x` flag is used to inform the planner we are going to pass it a library with the external solver description; the `-n -t10` flags are used instead to enable the *anytime* planning modality, making the system run for uo to *t* seconds (here *10*), which allows to find the best path across multiple runs.
+> WARN: This flag is *mandatory* to actually obtain a semi-optimal planning, since with the first run the planner generally doesn't seem to take into account the cost that much, might be a problem of local minima.
+
+## Docker Image
+
+To make it easier to install and test the system, especially considering the relatively long list of dependencies, a Docker Image is provided: [hypothe/ai4ro2_2](https://hub.docker.com/repository/docker/hypothe/ai4ro2_2).
+Every important note is already written at that link. I highly suggest to give it a try, since it makes testing that much faster and manageable!
 
 ## Authors
 
