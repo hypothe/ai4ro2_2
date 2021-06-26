@@ -8,20 +8,32 @@ Each path between two regions is associated with a cost, a function of the Eucli
 The path planning is carried out by the PDDL 2.1 planner, whilst an external solver (*a semantic attachment*) computed the weight associated to each edge between regions.
 More info on each step in the respective section later on.
 
-## The Map
-```
-....o...o....  
-..*---*---*..  
-.o|.x.|.x.|o.  
-..*---*---*..  
-.o|.x.|.x.|o.  
-..*---*---*..  
-....o...o....  
-```
+## Content
 
-Where the `*` represent waypoints, `o` beacons, the lines edges of the region graph (`-`, ,`|`, and also `x`, representing two diagonal connections).
-The robot starts in the center region (0,0) and has to reach the 4 cardinal regions (1:E, 2:N, 3:W, 4:S), whereas the vertices of the square are just intermediate regions (12:NE, 23:NW, 34:SW, 41:SE).
-Passing for the outer edges brings the robot close enough to the beacons to detect them and reduce the uncertainty on its state, and are thus to be preferred in this implementation.
+```
+ai4ro2_2/
+    |
+    visit_domain/   , task planning files
+        |
+        dom1.pddl       , domain description
+        landmark.txt    , beacons poses
+        prob1.pddl      , problem description
+        region_poses    , association region-waypoints
+        waypoint.txt    , waypoint poses
+    visit_module/   , motion planning files
+        |
+        src/            , motion planning scripts
+            |
+            CMakeLists.txt  , the cmake used, linking directories to the library
+            ExternalSolver.cpp  , definition of the interface used for the semantic attachments
+            ExternalSolver.h    , declaration of the interface used for the semantic attachments
+            VisitSolver.cpp     , definition of the class implementing the EKF
+            VisitSolver.h       , declaration of the class implementing the EKF
+            buildInstruction.txt, script used to build the library
+            main.cpp            , 
+    LICENSE     , GNU v3.0 license
+    README.md   , this file
+```
 
 ---
 
@@ -47,21 +59,21 @@ To simulate the robot movement, the path is then split up into segment as long a
 For each of these steps the robot state `X_k` is updated, as is its covariance matrix `P_k`, with only the odometry data and a synthetic noise simulating odometry inaccuracy.  
 Furthermore, if the robot is close enough to one of the beacons, `X_k` and `P_k` are updated with EKF approach, using the measurement **innovation** and the "confidence" in such value.
 
-$$
-\begin{cases}
-    \hat X_{k+1/k} = \Delta D_{k} + \alpha_{k} \\
-    P_{k+1/k} = A_k P_{k/k} * A_k^T + Q_{\alpha}
-\end{cases}
-$$
+$$   
+\begin{cases}   
+    \hat X_{k+1/k} = \Delta D_{k} + \alpha_{k} \\     
+    P_{k+1/k} = A_k P_{k/k} * A_k^T + Q_{\alpha}   
+\end{cases}   
+$$   
 > *Odometry-only update*
 
 
-$$
-\begin{cases}
-    \hat X_{k+1/k+1} = \hat X_{k+1/k} + K_k (Y_k - g (\hat X_{k+1/k} ) ) \\
+$$  
+\begin{cases}   
+    \hat X_{k+1/k+1} = \hat X_{k+1/k} + K_k (Y_k - g (\hat X_{k+1/k} ) ) \\   
     P_{k+1/k+1} = (I - K_kC_k)P_{k+1/k}
-\end{cases}
-$$
+\end{cases}   
+$$  
 > *Beacon-detection update*
 
 *See [Extended Kalman Filter](https://en.wikipedia.org/wiki/Extended_Kalman_filter) on Wikipedia for more details on what each term is.* 
@@ -83,7 +95,7 @@ Plese refer to the `VisitSolver.h` header to for any further info on those value
  The distance at which the robot can detect a beacon, here *50 cm*. It's pretty small, given the *5 cm* detection error on the beacon measurement, but serves its purposes in the designed system, "enforcing" some routes (the external ones) instead of others. Definetely not a superlative beacon choice, might be akin to AprilTags?
 - **init_noise = 0.14**   
  The starting noise for each localization attempt, so as to have $P_{init} = 0.02 * I_{3x3}$
-- **trace-weight = 50**  
+- **trace_weight = 50**  
  The weight given to the $trace(P_k)$ in the cost of each region graph edge (the one returned to the *Task Planning* side and ideally to minimize). This valueshas been empirically found to yield a good balance between the Euclidean distance `(start,goal)` and the "confidence" in the path.  
  The cost function becomes
  $$
@@ -106,8 +118,38 @@ Once that process completes the planner can be executed with
 ```bash
     ai4ro2_2/visit_domain# path/to/popf3-clp -x -n -t10 dom1.pddl prob1.pddl ../visits_module/build/libVisits.so region_poses
 ```
-The `-x` flag is used to inform the planner we are going to pass it a library with the external solver description; the `-n -t10` flags are used instead to enable the *anytime* planning modality, making the system run for uo to *t* seconds (here *10*), which allows to find the best path across multiple runs.
+The `-x` flag is used to inform the planner we are going to pass it a library with the external solver description; the `-n -t10` flags are used instead to enable the *anytime* planning modality, making the system run for uo to *t* seconds (here *10*), which allows to expand the first solution found, hoping to discover better routes.
 > WARN: This flag is *mandatory* to actually obtain a semi-optimal planning, since with the first run the planner generally doesn't seem to take into account the cost that much, might be a problem of local minima.
+
+---
+
+## Testing
+
+The `region_poses`, `waypoint.txt`, and `landmark.txt` files describe a planning scenario developed to highlight the impact of the covariance matrix on the choice of a path. These files can be modified in order to depict diffent scenarios, even complex ones, thanks to their minimalistic syntax.
+
+### The Map
+```
+....o...o....  
+..*---*---*..  
+.o|.x.|.x.|o.  
+..*---*---*..  
+.o|.x.|.x.|o.  
+..*---*---*..  
+....o...o....  
+```
+This is the map described by the files currently present in this repository, where the `*` represent waypoints, `o` beacons, the lines edges of the region graph (`-`, ,`|`, and also `x`, representing two diagonal connections).
+The robot starts in the center region (0,0) and has to reach the 4 cardinal regions (1:E, 2:N, 3:W, 4:S), whereas the vertices of the square are just intermediate regions (12:NE, 23:NW, 34:SW, 41:SE).
+Passing for the outer edges brings the robot close enough to the beacons to detect them and reduce the uncertainty on its state, and are thus the preferred choices for the Task Planner in this implementation.
+
+### Expected Results
+
+By using the default values and scenario here presented, the results from the planner should be similar to these:
+
+where, by looking at the map previously presented, we can notice the robot generally prefers the outer edges, being closer to the beacons. Notice also that the difference in cost between a near-optimal plan and a simplistic one (where the robot moves directly between the 4 goal regions) is not extraordinary large, meaning the system could (and generally does) opt for hybrid solutions.
+
+![](images/)
+
+By tuning the **trace_weight** parameter, we can enforce different approaches, from a planning purely based on Euclidean distance (low **trace_weight**), obtaining something close to the second one presented above, or one where the covariance matrix becomes the predominant factor (high **trace_weight**, which results might be more evident in a more ad-hoc map).
 
 ## Docker Image
 
