@@ -115,7 +115,7 @@ Lastly, the *semantic attachment* library can be built with
     ai4ro2_2/visits_module/src# ./buildInstructions.txt
 ```
 
-Once that process completes the planner can be executed with
+Once the building process completes, the planner can be executed with
 
 ```bash
     ai4ro2_2/visits_domain# path/to/popf3-clp -x -n -t10 dom1.pddl prob1.pddl ../visits_module/build/libVisits.so region_poses
