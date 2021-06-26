@@ -33,5 +33,4 @@
 
 # Build files
 build/
-visits_module/src/.vscode/
-visits_module/src/.vscode/
+.vscode/
