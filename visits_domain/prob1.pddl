@@ -11,8 +11,8 @@
      (= (act-cost) 0)
      (= (dummy) 0)
 
-     ;; Uncomment these lines for 
-     ;; setting up a not fully connected graph
+     ;; Add or remove connections depending 
+     ;; on the desired graph
      (connected r0 r1) (connected r1 r0) 
      (connected r0 r2) (connected r2 r0) 
      (connected r0 r3) (connected r3 r0) 
