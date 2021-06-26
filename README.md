@@ -20,6 +20,7 @@ ai4ro2_2/
         prob1.pddl      , problem description
         region_poses    , association region-waypoints
         waypoint.txt    , waypoint poses
+    |
     visit_module/   , motion planning files
         |
         src/            , motion planning scripts
@@ -30,7 +31,8 @@ ai4ro2_2/
             VisitSolver.cpp     , definition of the class implementing the EKF
             VisitSolver.h       , declaration of the class implementing the EKF
             buildInstruction.txt, script used to build the library
-            main.cpp            , 
+            main.cpp            , main which can be used for a standalone test executable
+    |
     LICENSE     , GNU v3.0 license
     README.md   , this file
 ```
@@ -145,16 +147,16 @@ Passing for the outer edges brings the robot close enough to the beacons to dete
 
 By using the default values and scenario here presented, the results from the planner should be similar to these:
 
-where, by looking at the map previously presented, we can notice the robot generally prefers the outer edges, being closer to the beacons. Notice also that the difference in cost between a near-optimal plan and a simplistic one (where the robot moves directly between the 4 goal regions) is not extraordinary large, meaning the system could (and generally does) opt for hybrid solutions.
-
 ![](images/)
 
-By tuning the **trace_weight** parameter, we can enforce different approaches, from a planning purely based on Euclidean distance (low **trace_weight**), obtaining something close to the second one presented above, or one where the covariance matrix becomes the predominant factor (high **trace_weight**, which results might be more evident in a more ad-hoc map).
+where, by looking at the map previously presented, we can notice the robot generally prefers the outer edges, being closer to the beacons. Notice also that the difference in cost between a near-optimal plan and a simplistic one (where the robot moves directly between the 4 goal regions) is not extraordinary large, meaning the system could (and generally does) opt for hybrid solutions.
+
+By tuning the **trace_weight** parameter, we can enforce different approaches, from a planning purely based on Euclidean distance (low **trace_weight**), obtaining something close to the last one presented above, or one where the covariance matrix becomes the predominant factor (high **trace_weight**, which results might be more evident in an ad-hoc map).
 
 ## Docker Image
 
 To make it easier to install and test the system, especially considering the relatively long list of dependencies, a Docker Image is provided: [hypothe/ai4ro2_2:priv](https://hub.docker.com/repository/docker/hypothe/ai4ro2_2).
-Every important note is already written at that link. I highly suggest to give it a try, since it makes testing that much faster and manageable!
+Every important note is already written at that link. I highly suggest to give it a try, since it makes testing the system that much faster and more manageable!
 
 ## Authors
 

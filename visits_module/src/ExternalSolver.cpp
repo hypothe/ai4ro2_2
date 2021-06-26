@@ -32,6 +32,6 @@ bool ExternalSolver::isActiveHeuristic = false;
 bool ExternalSolver::verbose = false;
 list<string> ExternalSolver::parameters = list<string>();
 list<string> ExternalSolver::dependencies = list<string>();
-string ExternalSolver::name = "Ugo";
+string ExternalSolver::name = "EKF";
 //void* handle = dlopen(ExternalSolver::name.c_str(), RTLD_LAZY);
 //ExternalSolver *ExternalSolver::externalSolver = //(ExternalSolver*)dlsym(handle,"create_object");
