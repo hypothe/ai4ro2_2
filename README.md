@@ -149,10 +149,10 @@ By using the default values and scenario here presented, the results obtained fr
 <p align="middle">
     <img src="images/trace_run0.png" width="32%" title="Optimal plan">
     <img src="images/semi_opt_run.png" width="32%" title="Sub-optimal plan">
-    <img src="images/unopt_run.png" width="32%" title="Unoptimal plan">
+    <img src="images/unopt_run.png" width="32%" title="Non-optimal plan">
 </p>
 
-> *left to right:* `optimal`, `suboptimal`, and `non optimal` plans
+> *left to right:* `optimal`, `sub-optimal`, and `non-optimal` plans
 
 where, by looking at the map previously presented, we can notice that in the optimal scenario the robot travels along the outer edges, closer to the beacons ans thus lowering the localization uncertainty. Notice also that the difference in cost between an optimal plan and a simplistic one (where the robot moves directly between the 4 goal regions) is not extraordinary large, meaning the system could (and generally does) opt for hybrid solutions (see the middle plan).
 
