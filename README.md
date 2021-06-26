@@ -111,7 +111,7 @@ The `-x` flag is used to inform the planner we are going to pass it a library wi
 
 ## Docker Image
 
-To make it easier to install and test the system, especially considering the relatively long list of dependencies, a Docker Image is provided: [hypothe/ai4ro2_2](https://hub.docker.com/repository/docker/hypothe/ai4ro2_2).
+To make it easier to install and test the system, especially considering the relatively long list of dependencies, a Docker Image is provided: [hypothe/ai4ro2_2:priv](https://hub.docker.com/repository/docker/hypothe/ai4ro2_2).
 Every important note is already written at that link. I highly suggest to give it a try, since it makes testing that much faster and manageable!
 
 ## Authors
