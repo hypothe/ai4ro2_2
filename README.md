@@ -167,7 +167,7 @@ The complete code can be found on the [GitHub Repository](https://github.com/hyp
 
 To make it easier to install and test the system, especially considering the relatively long list of dependencies, a Docker Image is provided: [hypothe/ai4ro2_2:priv](https://hub.docker.com/repository/docker/hypothe/ai4ro2_2).
 Every important note is already written at that link. I highly suggest to give it a try, since it makes testing the system that much faster and more manageable!
-> NOTE: be sure to pull the "priv" tag, since the "latest" one does not automatically pull this repository.
+> NOTE: be sure to pull the "priv" tag, since the "latest" one does not automatically pull the repository with the code here presented.
 
 ## References
 
